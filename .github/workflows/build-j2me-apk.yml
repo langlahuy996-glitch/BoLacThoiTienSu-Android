@@ -15,18 +15,20 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect Retrova game page and download links
+      - name: Inspect Retrova download block
         shell: bash
         run: |
           set -euxo pipefail
           curl -fsSL --retry 3 -A 'Mozilla/5.0' 'https://java.retrova.vn/games/47/' -o page.html
-          wc -c page.html
-          grep -Eoi 'href=["'"'][^"'"']+|https?://[^"'"' <>]+' page.html | grep -Ei 'jar|download|320|file' | head -80 || true
-          grep -in -E '320x240|\.jar|download|tải' page.html | head -100 || true
+          echo '--- download area ---'
+          sed -n '900,1040p' page.html
+          echo '--- links/forms/data attrs ---'
           python3 - <<'PY'
           import re, html
           s=open('page.html',encoding='utf-8',errors='ignore').read()
-          for u in re.findall(r'(?:href|src)=["\']([^"\']+)',s,re.I):
-              if any(k in u.lower() for k in ('.jar','download','320','file')):
-                  print('CANDIDATE',html.unescape(u))
+          for pat in [r'href=["\']([^"\']+)', r'action=["\']([^"\']+)', r'(?:data-[\w-]+)=["\']([^"\']+)', r'https?://[^"\' <>]+']:
+              for u in re.findall(pat,s,re.I):
+                  u=html.unescape(u)
+                  if any(k in u.lower() for k in ('download','.jar','file','version','320')):
+                      print('CANDIDATE',u)
           PY
