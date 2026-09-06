@@ -1,4 +1,4 @@
-name: Build Bo Lac Thoi Tien Su APK
+name: Probe Bo Lac 320x240 JAR
 
 on:
   push:
@@ -10,96 +10,23 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 10
     steps:
-      - name: Checkout build repository
-        uses: actions/checkout@v4
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK and NDK
+      - uses: actions/checkout@v4
+      - name: Download exact 320x240 JAR with browser headers
         shell: bash
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;22.1.7171670"
-
-      - name: Clone J2ME Loader 1.8.2
-        run: git clone --depth 1 --branch 1.8.2 https://github.com/nikita36078/J2ME-Loader.git j2me
-
-      - name: Download 320x240 game JAR
-        shell: bash
-        run: |
-          curl -fL --retry 4 --retry-delay 3 \
-            "https://dinhloi.xtgem.com/java/game/bo-lac-tts/Bo_Lac_Tien_Su_320x240.jar" \
-            -o game.jar
+          set -euxo pipefail
+          URL='https://dinhloi.xtgem.com/java/game/bo-lac-tts/Bo_Lac_Tien_Su_320x240.jar'
+          curl -L --retry 3 --retry-delay 2 \
+            -A 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36' \
+            -e 'https://dinhloi.xtgem.com/game-offline/game-hay/bo-lac-tts' \
+            -H 'Accept: application/java-archive,application/octet-stream,*/*' \
+            "$URL" -o game.jar
+          file game.jar
+          wc -c game.jar
+          xxd -l 16 game.jar
           unzip -t game.jar
-
-      - name: Prepare standalone MIDlet port
-        shell: bash
-        run: |
-          cd j2me
-          rm -rf app/src/midlet/java/*
-          rm -rf app/src/midlet/resources/*
-          mkdir -p app/src/midlet/resources/MIDLET-META-INF app/libs /tmp/bolac
-          unzip -q ../game.jar -d /tmp/bolac
-          cp ../game.jar app/libs/midlet-game.jar
-          cp -a /tmp/bolac/. app/src/midlet/resources/
-          find app/src/midlet/resources -type f -name '*.class' -delete
-          rm -rf app/src/midlet/resources/META-INF
-          mkdir -p app/src/midlet/resources/MIDLET-META-INF
-          cat > app/src/midlet/resources/MIDLET-META-INF/MANIFEST.MF <<'EOF'
-          Manifest-Version: 1.0
-          MIDlet-Name: Bo Lac Thoi Tien Su VH By Sykeo99
-          MIDlet-Version: 0.1.30
-          MIDlet-Vendor: THQ/BiNPDA
-          MIDlet-1: Bo Lac Thoi Tien Su VH By Sykeo99, icon.png, tribes
-          MicroEdition-Profile: MIDP-2.0
-          MicroEdition-Configuration: CLDC-1.0
-          MIDlet-Icon: /icon.png
-          Cheat-Support: off
-          GameLinkEnabled: false
-
-          EOF
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('app/build.gradle')
-          s = p.read_text()
-          marker = 'dependencies {'
-          if "implementation files('libs/midlet-game.jar')" not in s:
-              s = s.replace(marker, marker + "\n    implementation files('libs/midlet-game.jar')", 1)
-          p.write_text(s)
-          PY
-
-      - name: Build standalone APK
-        working-directory: j2me
-        shell: bash
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleMidletDebug --stacktrace --no-daemon
-
-      - name: Collect APK
-        shell: bash
-        run: |
-          mkdir -p out
-          APK="$(find j2me/app/build/outputs/apk -type f -name '*.apk' | head -n 1)"
-          echo "APK=$APK"
-          test -n "$APK"
-          cp "$APK" out/BoLacThoiTienSu_Android_V1.apk
-          ls -lh out/BoLacThoiTienSu_Android_V1.apk
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: BoLacThoiTienSu-APK
-          path: out/BoLacThoiTienSu_Android_V1.apk
-          if-no-files-found: error
-          retention-days: 30
+          unzip -p game.jar META-INF/MANIFEST.MF | head -40
