@@ -1,34 +1,24 @@
-name: Probe Retrova Bo Lac 320x240
-
+name: Probe Retrova download endpoint
 on:
   push:
-    paths:
-      - '.github/workflows/build-j2me-apk.yml'
+    paths: ['.github/workflows/build-j2me-apk.yml']
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   probe:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect Retrova download block
+      - name: Inspect endpoint candidates
         shell: bash
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           curl -fsSL --retry 3 -A 'Mozilla/5.0' 'https://java.retrova.vn/games/47/' -o page.html
-          echo '--- download area ---'
-          sed -n '900,1040p' page.html
-          echo '--- links/forms/data attrs ---'
-          python3 - <<'PY'
-          import re, html
-          s=open('page.html',encoding='utf-8',errors='ignore').read()
-          for pat in [r'href=["\']([^"\']+)', r'action=["\']([^"\']+)', r'(?:data-[\w-]+)=["\']([^"\']+)', r'https?://[^"\' <>]+']:
-              for u in re.findall(pat,s,re.I):
-                  u=html.unescape(u)
-                  if any(k in u.lower() for k in ('download','.jar','file','version','320')):
-                      print('CANDIDATE',u)
-          PY
+          echo '--- ATTRS ---'
+          grep -nEi 'href=|action=|onclick=|fetch\(|axios|XMLHttpRequest|/api/|download|\.jar|data-' page.html | tail -220 || true
+          echo '--- SCRIPTS ---'
+          grep -nEi '<script|src=' page.html | tail -80 || true
+          echo '--- LAST 220 ---'
+          tail -220 page.html
