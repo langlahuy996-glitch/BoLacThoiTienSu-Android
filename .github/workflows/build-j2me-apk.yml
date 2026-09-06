@@ -1,4 +1,4 @@
-name: Probe Bo Lac 320x240 JAR
+name: Probe Retrova Bo Lac 320x240
 
 on:
   push:
@@ -15,18 +15,18 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Download exact 320x240 JAR with browser headers
+      - name: Inspect Retrova game page and download links
         shell: bash
         run: |
           set -euxo pipefail
-          URL='https://dinhloi.xtgem.com/java/game/bo-lac-tts/Bo_Lac_Tien_Su_320x240.jar'
-          curl -L --retry 3 --retry-delay 2 \
-            -A 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36' \
-            -e 'https://dinhloi.xtgem.com/game-offline/game-hay/bo-lac-tts' \
-            -H 'Accept: application/java-archive,application/octet-stream,*/*' \
-            "$URL" -o game.jar
-          file game.jar
-          wc -c game.jar
-          xxd -l 16 game.jar
-          unzip -t game.jar
-          unzip -p game.jar META-INF/MANIFEST.MF | head -40
+          curl -fsSL --retry 3 -A 'Mozilla/5.0' 'https://java.retrova.vn/games/47/' -o page.html
+          wc -c page.html
+          grep -Eoi 'href=["'"'][^"'"']+|https?://[^"'"' <>]+' page.html | grep -Ei 'jar|download|320|file' | head -80 || true
+          grep -in -E '320x240|\.jar|download|tải' page.html | head -100 || true
+          python3 - <<'PY'
+          import re, html
+          s=open('page.html',encoding='utf-8',errors='ignore').read()
+          for u in re.findall(r'(?:href|src)=["\']([^"\']+)',s,re.I):
+              if any(k in u.lower() for k in ('.jar','download','320','file')):
+                  print('CANDIDATE',html.unescape(u))
+          PY
